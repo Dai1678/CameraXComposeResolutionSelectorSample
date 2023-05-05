@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">CameraXComposeResolutionSelectorSample</string>
+    <string name="permission_required_rationale">カメラ機能を利用するには権限の許可をしてください。</string>
+    <string name="permission_revoked_rationale">カメラ機能を利用するにはシステム設定から権限の許可をしてください。</string>
+    <string name="allow_permission">許可する</string>
+    <string name="message_failed_binding_camera">カメラの起動に失敗しました。端末の再起動をお試しください。</string>
+    <string name="message_pending_open_camera">他にカメラ機能を利用したアプリを起動している場合は、そのアプリを終了してください。</string>
+    <string name="message_error_do_not_disturb_mode_enabled">おやすみ時間モードをOFFにしてから再度お試しください。</string>
+    <string name="message_success_save_image">画像を保存しました\n保存先: %1$s</string>
+    <string name="message_failed_save_image">撮影に失敗しました。</string>
+</resources>
