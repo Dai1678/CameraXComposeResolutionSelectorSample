@@ -3,6 +3,7 @@ Camera X × Jetpack Compose × Resolution Selector API sample
 
 ## Feature
 - Take photo (Only Back Camera)
+- Zoom
 - Torch
 - Touch & Focus
 
