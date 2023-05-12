@@ -11,7 +11,6 @@ import android.view.GestureDetector.SimpleOnGestureListener
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import androidx.camera.core.Camera
-import androidx.camera.core.CameraControl
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.CameraState
 import androidx.camera.core.FocusMeteringAction
@@ -25,6 +24,7 @@ import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.core.resolutionselector.ResolutionSelector.HIGH_RESOLUTION_FLAG_ON
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -50,6 +50,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
@@ -159,7 +160,11 @@ private fun CameraContent(
     }
     var isLoading by remember { mutableStateOf(false) }
 
-    Box(modifier = modifier.fillMaxSize()) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(Color.Black)
+    ) {
         AndroidView(
             factory = { PreviewView(it) },
             modifier = Modifier
@@ -233,7 +238,9 @@ private fun CameraContent(
         }
 
         when (val state = bindingState) {
-            BindingState.Initial -> { isLoading = true }
+            BindingState.Initial -> {
+                isLoading = true
+            }
 
             BindingState.Failed -> {
                 isLoading = false
@@ -265,9 +272,11 @@ private fun CameraContent(
                         CameraState.Type.OPEN -> {
                             isLoading = false
                             CameraUiController(
-                                cameraControl = state.camera.cameraControl,
                                 hasFlashUnit = hasFlashUnit,
                                 torchState = torchState.value,
+                                onClickTorch = {
+                                    state.camera.cameraControl.enableTorch(torchState.value == TorchState.OFF)
+                                },
                                 takePhoto = {
                                     isLoading = true
                                     takePhoto(
@@ -286,7 +295,9 @@ private fun CameraContent(
                             )
                         }
 
-                        else -> { isLoading = true }
+                        else -> {
+                            isLoading = true
+                        }
                     }
 
                     it.error?.let { stateError ->
@@ -300,18 +311,16 @@ private fun CameraContent(
 
 @Composable
 private fun CameraUiController(
-    cameraControl: CameraControl,
     hasFlashUnit: Boolean,
     torchState: Int,
+    onClickTorch: () -> Unit,
     takePhoto: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         if (hasFlashUnit) {
             IconButton(
-                onClick = {
-                    cameraControl.enableTorch(torchState == TorchState.OFF)
-                },
+                onClick = onClickTorch,
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .padding(16.dp)
@@ -325,6 +334,7 @@ private fun CameraUiController(
                         }
                     ),
                     contentDescription = null,
+                    tint = Color.Unspecified,
                     modifier = Modifier.size(32.dp)
                 )
             }
@@ -339,7 +349,8 @@ private fun CameraUiController(
             Icon(
                 painter = painterResource(id = R.drawable.ic_shutter),
                 contentDescription = null,
-                modifier.size(64.dp)
+                tint = Color.Unspecified,
+                modifier = Modifier.size(40.dp)
             )
         }
     }
