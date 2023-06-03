@@ -26,13 +26,13 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -41,6 +41,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
@@ -55,6 +56,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.concurrent.futures.await
@@ -69,7 +71,6 @@ private const val FILENAME = "yyyy-MM-dd-HH-mm-ss-SSS"
 private const val PHOTO_TYPE = "image/jpeg"
 private const val MIN_SCALE_RATIO = 1.0f
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CameraScreen() {
     val context = LocalContext.current
@@ -146,10 +147,11 @@ private fun CameraContent(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    var bindingState: BindingState by remember(context, provider, lifecycleOwner) {
-        mutableStateOf(BindingState.Initial)
+    var currentLensFacing: CameraSelector by remember {
+        mutableStateOf(CameraSelector.DEFAULT_BACK_CAMERA)
     }
-    val imageCapture = remember(context, provider, lifecycleOwner) {
+    val previewView = remember { PreviewView(context) }
+    val imageCapture = remember {
         ImageCapture.Builder()
             .setResolutionSelector(
                 ResolutionSelector.Builder()
@@ -158,152 +160,163 @@ private fun CameraContent(
             )
             .build()
     }
-    var isLoading by remember { mutableStateOf(false) }
+    var bindingCamera: Camera? by remember {
+        mutableStateOf(null)
+    }
+    var isErrorCameraBinding: Boolean by remember { mutableStateOf(false) }
+    var isLoading: Boolean by remember { mutableStateOf(false) }
+    val cameraState = bindingCamera?.cameraInfo?.cameraState?.observeAsState()
+    val torchState = bindingCamera?.cameraInfo?.torchState?.observeAsState(TorchState.OFF)
+    val hasFlashUnit = bindingCamera?.cameraInfo?.hasFlashUnit() ?: false
 
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(Color.Black)
-    ) {
-        AndroidView(
-            factory = { PreviewView(it) },
-            modifier = Modifier
-                .fillMaxSize()
-                .aspectRatio(4f / 3f),
-            update = { previewView ->
-                if (bindingState is BindingState.Initial) {
-                    bindingState = try {
-                        provider.unbindAll()
-                        val camera = provider.bindToLifecycle(
-                            lifecycleOwner,
-                            CameraSelector.DEFAULT_BACK_CAMERA,
-                            imageCapture,
-                            Preview.Builder()
-                                .build()
-                                .apply {
-                                    setSurfaceProvider(previewView.surfaceProvider)
-                                }
-                        )
+    LaunchedEffect(currentLensFacing) {
+        try {
+            provider.unbindAll()
+            val camera = provider.bindToLifecycle(
+                lifecycleOwner,
+                currentLensFacing,
+                imageCapture,
+                Preview.Builder()
+                    .build()
+                    .apply {
+                        setSurfaceProvider(previewView.surfaceProvider)
+                    }
+            )
 
-                        val gestureDetector = GestureDetector(
-                            previewView.context,
-                            object : SimpleOnGestureListener() {
-                                override fun onDown(e: MotionEvent): Boolean = true
+            val gestureDetector = GestureDetector(
+                context,
+                object : SimpleOnGestureListener() {
+                    override fun onDown(e: MotionEvent): Boolean = true
 
-                                override fun onSingleTapUp(e: MotionEvent): Boolean {
-                                    val meteringPointFactory = previewView.meteringPointFactory
-                                    val focusPoint = meteringPointFactory.createPoint(e.x, e.y)
-                                    focus(camera, focusPoint)
-                                    return true
-                                }
-                            }
-                        )
-
-                        val scaleGestureDetector = ScaleGestureDetector(
-                            previewView.context,
-                            object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
-                                override fun onScale(detector: ScaleGestureDetector): Boolean {
-                                    scale(camera, detector.scaleFactor)
-                                    return true
-                                }
-                            }
-                        )
-
-                        previewView.setOnTouchListener { view, event ->
-                            var didConsume = scaleGestureDetector.onTouchEvent(event)
-                            if (!scaleGestureDetector.isInProgress) {
-                                didConsume = gestureDetector.onTouchEvent(event)
-                            }
-                            if (event.action == MotionEvent.ACTION_UP) {
-                                view.performClick()
-                            }
-                            didConsume
-                        }
-
-                        BindingState.Success(camera)
-                    } catch (e: Exception) {
-                        BindingState.Failed
+                    override fun onSingleTapUp(e: MotionEvent): Boolean {
+                        val meteringPointFactory = previewView.meteringPointFactory
+                        val focusPoint = meteringPointFactory.createPoint(e.x, e.y)
+                        focus(camera, focusPoint)
+                        return true
                     }
                 }
-            }
-        )
+            )
 
-        if (isLoading) {
-            CircularProgressIndicator(
-                color = MaterialTheme.colorScheme.secondary,
+            val scaleGestureDetector = ScaleGestureDetector(
+                context,
+                object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+                    override fun onScale(detector: ScaleGestureDetector): Boolean {
+                        scale(camera, detector.scaleFactor)
+                        return true
+                    }
+                }
+            )
+
+            previewView.setOnTouchListener { view, event ->
+                var didConsume = scaleGestureDetector.onTouchEvent(event)
+                if (!scaleGestureDetector.isInProgress) {
+                    didConsume = gestureDetector.onTouchEvent(event)
+                }
+                if (event.action == MotionEvent.ACTION_UP) {
+                    view.performClick()
+                }
+                didConsume
+            }
+
+            bindingCamera = camera
+        } catch (e: Exception) {
+            isErrorCameraBinding = true
+        }
+    }
+
+    Box(modifier = modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+        ) {
+
+            AndroidView(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .wrapContentSize()
+                    .weight(1F)
+                    .aspectRatio(3f / 4f),
+                factory = {
+                    previewView.also {
+                        it.clipToOutline = true
+                    }
+                }
+            )
+
+            CameraUiController(
+                modifier = Modifier.weight(0.25F),
+                enabled = cameraState?.value?.type == CameraState.Type.OPEN,
+                hasFlashUnit = hasFlashUnit,
+                torchState = torchState?.value,
+                onClickTorch = {
+                    val camera = bindingCamera ?: return@CameraUiController
+                    camera.cameraControl.enableTorch(torchState?.value == TorchState.OFF)
+                },
+                onClickShutter = {
+                    isLoading = true
+                    takePhoto(
+                        context,
+                        imageCapture,
+                        onImageSaved = {
+                            isLoading = false
+                            onImageSaveSuccess(it)
+                        },
+                        onError = {
+                            isLoading = false
+                            onImageSaveFailed(it)
+                        }
+                    )
+                }
             )
         }
 
-        when (val state = bindingState) {
-            BindingState.Initial -> {
-                isLoading = true
+        cameraState?.value?.let {
+            when (it.type) {
+                CameraState.Type.PENDING_OPEN -> {
+                    isLoading = false
+                    Text(
+                        text = stringResource(id = R.string.message_pending_open_camera),
+                        color = Color.White,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp)
+                            .wrapContentSize()
+                    )
+                }
+
+                CameraState.Type.OPEN -> {
+                    isLoading = false
+                }
+
+                else -> {
+                    isLoading = true
+                }
             }
 
-            BindingState.Failed -> {
-                isLoading = false
+            it.error?.let { stateError ->
+                onError(stateError)
+            }
+        }
+
+        when {
+            isErrorCameraBinding -> {
                 Text(
                     text = stringResource(id = R.string.message_failed_binding_camera),
+                    textAlign = TextAlign.Center,
                     modifier = Modifier
                         .fillMaxSize()
+                        .padding(16.dp)
                         .wrapContentSize()
                 )
             }
 
-            is BindingState.Success -> {
-                val cameraState = state.camera.cameraInfo.cameraState.observeAsState()
-                val torchState = state.camera.cameraInfo.torchState.observeAsState(TorchState.OFF)
-                val hasFlashUnit = state.camera.cameraInfo.hasFlashUnit()
-
-                cameraState.value?.let {
-                    when (it.type) {
-                        CameraState.Type.PENDING_OPEN -> {
-                            isLoading = false
-                            Text(
-                                text = stringResource(id = R.string.message_pending_open_camera),
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .wrapContentSize()
-                            )
-                        }
-
-                        CameraState.Type.OPEN -> {
-                            isLoading = false
-                            CameraUiController(
-                                hasFlashUnit = hasFlashUnit,
-                                torchState = torchState.value,
-                                onClickTorch = {
-                                    state.camera.cameraControl.enableTorch(torchState.value == TorchState.OFF)
-                                },
-                                takePhoto = {
-                                    isLoading = true
-                                    takePhoto(
-                                        context,
-                                        imageCapture,
-                                        onImageSaved = { results ->
-                                            isLoading = false
-                                            onImageSaveSuccess(results.savedUri)
-                                        },
-                                        onError = { exception ->
-                                            isLoading = false
-                                            onImageSaveFailed(exception)
-                                        }
-                                    )
-                                }
-                            )
-                        }
-
-                        else -> {
-                            isLoading = true
-                        }
-                    }
-
-                    it.error?.let { stateError ->
-                        onError(stateError)
-                    }
-                }
+            isLoading -> {
+                CircularProgressIndicator(
+                    color = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .wrapContentSize()
+                )
             }
         }
     }
@@ -311,16 +324,18 @@ private fun CameraContent(
 
 @Composable
 private fun CameraUiController(
+    enabled: Boolean,
     hasFlashUnit: Boolean,
-    torchState: Int,
+    torchState: Int?,
     onClickTorch: () -> Unit,
-    takePhoto: () -> Unit,
+    onClickShutter: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         if (hasFlashUnit) {
             IconButton(
                 onClick = onClickTorch,
+                enabled = enabled,
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .padding(16.dp)
@@ -341,7 +356,8 @@ private fun CameraUiController(
         }
 
         IconButton(
-            onClick = takePhoto,
+            onClick = onClickShutter,
+            enabled = enabled,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(32.dp)
@@ -354,12 +370,6 @@ private fun CameraUiController(
             )
         }
     }
-}
-
-private sealed interface BindingState {
-    object Initial : BindingState
-    object Failed : BindingState
-    data class Success(val camera: Camera) : BindingState
 }
 
 private fun focus(camera: Camera, meteringPoint: MeteringPoint) {
@@ -394,7 +404,7 @@ private fun speedUpZoomBy2X(scaleFactor: Float): Float {
 private fun takePhoto(
     context: Context,
     imageCapture: ImageCapture,
-    onImageSaved: (OutputFileResults) -> Unit,
+    onImageSaved: (Uri?) -> Unit,
     onError: (ImageCaptureException) -> Unit
 ) {
     val fileName = SimpleDateFormat(FILENAME, Locale.JAPAN).format(System.currentTimeMillis())
@@ -419,7 +429,7 @@ private fun takePhoto(
         ContextCompat.getMainExecutor(context),
         object : ImageCapture.OnImageSavedCallback {
             override fun onImageSaved(outputFileResults: OutputFileResults) {
-                onImageSaved(outputFileResults)
+                onImageSaved(outputFileResults.savedUri)
             }
 
             override fun onError(exception: ImageCaptureException) {
