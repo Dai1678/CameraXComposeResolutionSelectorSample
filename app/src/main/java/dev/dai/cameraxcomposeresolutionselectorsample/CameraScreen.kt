@@ -21,7 +21,7 @@ import androidx.camera.core.MeteringPoint
 import androidx.camera.core.Preview
 import androidx.camera.core.TorchState
 import androidx.camera.core.resolutionselector.ResolutionSelector
-import androidx.camera.core.resolutionselector.ResolutionSelector.HIGH_RESOLUTION_FLAG_ON
+import androidx.camera.core.resolutionselector.ResolutionSelector.ALLOWED_RESOLUTIONS_SLOW
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
@@ -153,7 +153,7 @@ private fun CameraContent(
         ImageCapture.Builder()
             .setResolutionSelector(
                 ResolutionSelector.Builder()
-                    .setHighResolutionEnabledFlag(HIGH_RESOLUTION_FLAG_ON)
+                    .setAllowedResolutionMode(ALLOWED_RESOLUTIONS_SLOW)
                     .build()
             )
             .build()
