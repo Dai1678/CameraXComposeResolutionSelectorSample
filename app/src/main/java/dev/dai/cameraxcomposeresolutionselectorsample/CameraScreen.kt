@@ -91,40 +91,52 @@ fun CameraScreen() {
     ) { innerPadding ->
         val provider = providerState.value
         if (provider != null) {
-            CameraContent(
-                provider = provider,
-                modifier = Modifier.padding(innerPadding),
-                onImageSaveSuccess = { uri ->
-                    val message = if (uri != null) {
-                        context.getString(R.string.message_success_save_image, uri.toString())
-                    } else {
-                        context.getString(R.string.message_failed_save_image)
-                    }
-                    scope.launch { snackBarHostState.showSnackbar(message) }
-                },
-                onImageSaveFailed = {
-                    Log.e("CameraScreen", it.message, it)
-                    scope.launch {
-                        snackBarHostState.showSnackbar(context.getString(R.string.message_failed_save_image))
-                    }
-                },
-                onError = {
-                    Log.e("CameraScreen", it.cause?.message, it.cause)
-                    when (it.type) {
-                        CameraState.ErrorType.RECOVERABLE -> Unit
-                        CameraState.ErrorType.CRITICAL -> {
-                            val message = context.getString(
-                                if (it.code == CameraState.ERROR_DO_NOT_DISTURB_MODE_ENABLED) {
-                                    R.string.message_error_do_not_disturb_mode_enabled
-                                } else {
-                                    R.string.message_failed_binding_camera
-                                }
-                            )
-                            scope.launch { snackBarHostState.showSnackbar(message) }
+            if (provider.availableCameraInfos.isEmpty()) {
+                Text(
+                    text = stringResource(id = R.string.message_pending_open_camera),
+                    color = Color.White,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp)
+                        .wrapContentSize()
+                )
+            } else {
+                CameraContent(
+                    provider = provider,
+                    modifier = Modifier.padding(innerPadding),
+                    onImageSaveSuccess = { uri ->
+                        val message = if (uri != null) {
+                            context.getString(R.string.message_success_save_image, uri.toString())
+                        } else {
+                            context.getString(R.string.message_failed_save_image)
+                        }
+                        scope.launch { snackBarHostState.showSnackbar(message) }
+                    },
+                    onImageSaveFailed = {
+                        Log.e("CameraScreen", it.message, it)
+                        scope.launch {
+                            snackBarHostState.showSnackbar(context.getString(R.string.message_failed_save_image))
+                        }
+                    },
+                    onError = {
+                        Log.e("CameraScreen", it.cause?.message, it.cause)
+                        when (it.type) {
+                            CameraState.ErrorType.RECOVERABLE -> Unit
+                            CameraState.ErrorType.CRITICAL -> {
+                                val message = context.getString(
+                                    if (it.code == CameraState.ERROR_DO_NOT_DISTURB_MODE_ENABLED) {
+                                        R.string.message_error_do_not_disturb_mode_enabled
+                                    } else {
+                                        R.string.message_failed_binding_camera
+                                    }
+                                )
+                                scope.launch { snackBarHostState.showSnackbar(message) }
+                            }
                         }
                     }
-                }
-            )
+                )
+            }
         } else {
             CircularProgressIndicator(
                 color = MaterialTheme.colorScheme.secondary,
