@@ -52,6 +52,7 @@ fun PermissionScreen() {
                 Lifecycle.Event.ON_START -> {
                     multiplePermissionState.launchMultiplePermissionRequest()
                 }
+
                 else -> Unit
             }
         }
@@ -70,12 +71,9 @@ fun PermissionScreen() {
         contentAlignment = Alignment.Center
     ) {
         when {
-            multiplePermissionState.allPermissionsGranted  -> {
+            multiplePermissionState.allPermissionsGranted -> {
                 CameraScreen()
             }
-
-            // onResumeで担保
-            !multiplePermissionState.permissionRequested -> Unit
 
             multiplePermissionState.shouldShowRationale -> {
                 RevokedPermissionScreen(
