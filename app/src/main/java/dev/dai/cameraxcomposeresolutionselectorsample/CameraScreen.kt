@@ -26,7 +26,6 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -220,54 +219,60 @@ private fun CameraContent(
 
             bindingCamera = camera
         } catch (e: Exception) {
+            Log.e("CameraContent", e.message, e)
             isErrorCameraBinding = true
         }
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
-        Column(
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(Color.Black)
+    ) {
+        AndroidView(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black)
-        ) {
+                .aspectRatio(3f / 4f),
+            factory = {
+                previewView.also {
+                    it.clipToOutline = true
+                }
+            }
+        )
 
-            AndroidView(
-                modifier = Modifier
-                    .weight(1F)
-                    .aspectRatio(3f / 4f),
-                factory = {
-                    previewView.also {
-                        it.clipToOutline = true
+        CameraUiController(
+            enabled = cameraState?.value?.type == CameraState.Type.OPEN,
+            hasFlashUnit = hasFlashUnit,
+            torchState = torchState?.value,
+            onClickTorch = {
+                val camera = bindingCamera ?: return@CameraUiController
+                camera.cameraControl.enableTorch(torchState?.value == TorchState.OFF)
+            },
+            onClickShutter = {
+                isLoading = true
+                takePhoto(
+                    context,
+                    imageCapture,
+                    onImageSaved = {
+                        isLoading = false
+                        onImageSaveSuccess(it)
+                    },
+                    onError = {
+                        isLoading = false
+                        onImageSaveFailed(it)
                     }
-                }
-            )
-
-            CameraUiController(
-                modifier = Modifier.weight(0.25F),
-                enabled = cameraState?.value?.type == CameraState.Type.OPEN,
-                hasFlashUnit = hasFlashUnit,
-                torchState = torchState?.value,
-                onClickTorch = {
-                    val camera = bindingCamera ?: return@CameraUiController
-                    camera.cameraControl.enableTorch(torchState?.value == TorchState.OFF)
-                },
-                onClickShutter = {
-                    isLoading = true
-                    takePhoto(
-                        context,
-                        imageCapture,
-                        onImageSaved = {
-                            isLoading = false
-                            onImageSaveSuccess(it)
-                        },
-                        onError = {
-                            isLoading = false
-                            onImageSaveFailed(it)
-                        }
-                    )
-                }
-            )
-        }
+                )
+            },
+            onClickFlipCamera = {
+                val camera = bindingCamera ?: return@CameraUiController
+                currentLensFacing =
+                    if (camera.cameraInfo.lensFacing == CameraSelector.LENS_FACING_BACK) {
+                        CameraSelector.DEFAULT_FRONT_CAMERA
+                    } else {
+                        CameraSelector.DEFAULT_BACK_CAMERA
+                    }
+            }
+        )
 
         cameraState?.value?.let {
             when (it.type) {
@@ -329,6 +334,7 @@ private fun CameraUiController(
     torchState: Int?,
     onClickTorch: () -> Unit,
     onClickShutter: () -> Unit,
+    onClickFlipCamera: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Box(modifier = modifier.fillMaxSize()) {
@@ -367,6 +373,21 @@ private fun CameraUiController(
                 contentDescription = null,
                 tint = Color.Unspecified,
                 modifier = Modifier.size(40.dp)
+            )
+        }
+
+        IconButton(
+            onClick = onClickFlipCamera,
+            enabled = enabled,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 16.dp, bottom = 52.dp)
+                .size(32.dp)
+        ) {
+            Icon(
+                painter = painterResource(id = R.drawable.ic_flip_camera),
+                contentDescription = null,
+                tint = Color.Unspecified
             )
         }
     }
