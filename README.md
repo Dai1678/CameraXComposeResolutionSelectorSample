@@ -9,4 +9,4 @@ Camera X × Jetpack Compose × Resolution Selector API sample
 - Torch
 - Touch & Focus
 
-<img src="https://github.com/Dai1678/CameraXComposeResolutionSelectorSample/assets/19250035/ebdd3207-e8ae-4f0a-9413-575158b2f3b7" width=300>
+<img src="https://github.com/Dai1678/CameraXComposeResolutionSelectorSample/assets/19250035/b79a9430-7ef9-4e35-9ad9-0dc60cfe6f2f" width=300>
