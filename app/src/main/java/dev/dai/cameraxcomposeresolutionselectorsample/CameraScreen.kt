@@ -10,6 +10,8 @@ import android.view.GestureDetector
 import android.view.GestureDetector.SimpleOnGestureListener
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
+import androidx.camera.core.AspectRatio
+import androidx.camera.core.AspectRatio.Ratio
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.CameraState
@@ -20,6 +22,7 @@ import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.MeteringPoint
 import androidx.camera.core.Preview
 import androidx.camera.core.TorchState
+import androidx.camera.core.resolutionselector.AspectRatioStrategy
 import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.core.resolutionselector.ResolutionSelector.ALLOWED_RESOLUTIONS_SLOW
 import androidx.camera.lifecycle.ProcessCameraProvider
@@ -29,8 +32,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -170,11 +175,19 @@ private fun CameraContent(
     }
     val canFlipCamera = provider.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA) &&
             provider.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA)
+    var currentAspectRatio: Int by remember { mutableStateOf(AspectRatio.RATIO_4_3) }
     val previewView = remember { PreviewView(context) }
-    val imageCapture = remember {
+    val imageCapture = remember(currentAspectRatio) {
         ImageCapture.Builder()
             .setResolutionSelector(
                 ResolutionSelector.Builder()
+                    .setAspectRatioStrategy(
+                        if (currentAspectRatio == AspectRatio.RATIO_16_9) {
+                            AspectRatioStrategy.RATIO_16_9_FALLBACK_AUTO_STRATEGY
+                        } else {
+                            AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY
+                        }
+                    )
                     .setAllowedResolutionMode(ALLOWED_RESOLUTIONS_SLOW)
                     .build()
             )
@@ -189,7 +202,7 @@ private fun CameraContent(
     val torchState = bindingCamera?.cameraInfo?.torchState?.observeAsState(TorchState.OFF)
     val hasFlashUnit = bindingCamera?.cameraInfo?.hasFlashUnit() ?: false
 
-    LaunchedEffect(currentLensFacing) {
+    LaunchedEffect(currentLensFacing, currentAspectRatio) {
         try {
             provider.unbindAll()
             val camera = provider.bindToLifecycle(
@@ -197,6 +210,17 @@ private fun CameraContent(
                 currentLensFacing,
                 imageCapture,
                 Preview.Builder()
+                    .setResolutionSelector(
+                        ResolutionSelector.Builder()
+                            .setAspectRatioStrategy(
+                                if (currentAspectRatio == AspectRatio.RATIO_16_9) {
+                                    AspectRatioStrategy.RATIO_16_9_FALLBACK_AUTO_STRATEGY
+                                } else {
+                                    AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY
+                                }
+                            )
+                            .build()
+                    )
                     .build()
                     .apply {
                         setSurfaceProvider(previewView.surfaceProvider)
@@ -252,10 +276,19 @@ private fun CameraContent(
     ) {
         AndroidView(
             modifier = Modifier
-                .fillMaxSize()
-                .aspectRatio(3f / 4f),
+                .then(
+                    if (currentAspectRatio == AspectRatio.RATIO_16_9) {
+                        Modifier
+                            .fillMaxWidth()
+                            .wrapContentHeight(Alignment.Top)
+                    } else {
+                        Modifier.fillMaxSize()
+                    }
+                )
+                .aspectRatio(currentAspectRatio.mapToFloat()),
             factory = {
                 previewView.also {
+                    // https://issuetracker.google.com/issues/242463987
                     it.clipToOutline = true
                 }
             }
@@ -265,10 +298,18 @@ private fun CameraContent(
             enabled = cameraState?.value?.type == CameraState.Type.OPEN,
             hasFlashUnit = hasFlashUnit,
             torchState = torchState?.value,
+            currentAspectRatio = currentAspectRatio,
             canFlipCamera = canFlipCamera,
             onClickTorch = {
                 val camera = bindingCamera ?: return@CameraUiController
                 camera.cameraControl.enableTorch(torchState?.value == TorchState.OFF)
+            },
+            onClickAspectRatio = {
+                currentAspectRatio = if (currentAspectRatio == AspectRatio.RATIO_16_9) {
+                    AspectRatio.RATIO_4_3
+                } else {
+                    AspectRatio.RATIO_16_9
+                }
             },
             onClickShutter = {
                 isLoading = true
@@ -354,8 +395,10 @@ private fun CameraUiController(
     enabled: Boolean,
     hasFlashUnit: Boolean,
     torchState: Int?,
+    @Ratio currentAspectRatio: Int,
     canFlipCamera: Boolean,
     onClickTorch: () -> Unit,
+    onClickAspectRatio: () -> Unit,
     onClickShutter: () -> Unit,
     onClickFlipCamera: () -> Unit,
     modifier: Modifier = Modifier
@@ -382,6 +425,27 @@ private fun CameraUiController(
                     modifier = Modifier.size(32.dp)
                 )
             }
+        }
+
+        IconButton(
+            onClick = onClickAspectRatio,
+            enabled = enabled,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(16.dp)
+        ) {
+            Icon(
+                painter = painterResource(
+                    id = if (currentAspectRatio == AspectRatio.RATIO_16_9) {
+                        R.drawable.ic_crop_wide
+                    } else {
+                        R.drawable.ic_crop_normal
+                    }
+                ),
+                contentDescription = null,
+                tint = Color.Unspecified,
+                modifier = Modifier.size(32.dp)
+            )
         }
 
         Icon(
@@ -411,6 +475,13 @@ private fun CameraUiController(
                 )
             }
         }
+    }
+}
+
+private fun @receiver:Ratio Int.mapToFloat(): Float {
+    return when (this) {
+        AspectRatio.RATIO_16_9 -> 9f / 16f
+        else -> 3f / 4f
     }
 }
 
