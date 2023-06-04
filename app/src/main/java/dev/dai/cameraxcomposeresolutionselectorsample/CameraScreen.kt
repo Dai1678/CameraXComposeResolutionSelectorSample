@@ -2,6 +2,7 @@ package dev.dai.cameraxcomposeresolutionselectorsample
 
 import android.content.ContentValues
 import android.content.Context
+import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
@@ -558,15 +559,16 @@ private fun takePhoto(
     val contentValues = ContentValues().apply {
         put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
         put(MediaStore.MediaColumns.MIME_TYPE, PHOTO_TYPE)
-        if (Build.VERSION.SDK_INT > Build.VERSION_CODES.P) {
-            put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/CameraX")
-        }
     }
 
     val outputOptions = ImageCapture.OutputFileOptions
         .Builder(
             context.contentResolver,
-            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+            } else {
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+            },
             contentValues
         )
         .build()
@@ -576,6 +578,32 @@ private fun takePhoto(
         ContextCompat.getMainExecutor(context),
         object : ImageCapture.OnImageSavedCallback {
             override fun onImageSaved(outputFileResults: OutputFileResults) {
+                // Android9以下の端末で正常にMediaStoreへの登録が行えておらず、
+                // 一部のギャラリーアプリなどで画面が意図しない角度で保存されている場合があるので、
+                // 念のため登録し直す
+                if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
+                    val contentUri = outputFileResults.savedUri ?: return
+                    var filePath: String? = null
+                    context.contentResolver.query(
+                        contentUri,
+                        arrayOf(MediaStore.MediaColumns.DATA),
+                        null,
+                        null,
+                        null
+                    )?.use {
+                        if (it.moveToFirst()) {
+                            filePath = it.getString(0)
+                        }
+                    }
+                    filePath?.let {
+                        MediaScannerConnection.scanFile(
+                            context,
+                            arrayOf(filePath),
+                            arrayOf("image/jpeg"),
+                            null
+                        )
+                    }
+                }
                 onImageSaved(outputFileResults.savedUri)
             }
 
