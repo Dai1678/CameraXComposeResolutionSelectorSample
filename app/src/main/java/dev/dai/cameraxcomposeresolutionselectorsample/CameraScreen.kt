@@ -93,7 +93,7 @@ fun CameraScreen() {
         if (provider != null) {
             if (provider.availableCameraInfos.isEmpty()) {
                 Text(
-                    text = stringResource(id = R.string.message_pending_open_camera),
+                    text = stringResource(id = R.string.message_not_found_available_camera),
                     color = Color.White,
                     textAlign = TextAlign.Center,
                     modifier = Modifier
