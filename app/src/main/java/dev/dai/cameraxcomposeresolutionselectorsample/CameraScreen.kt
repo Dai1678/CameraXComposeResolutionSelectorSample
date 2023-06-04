@@ -9,7 +9,9 @@ import android.util.Log
 import android.view.GestureDetector
 import android.view.GestureDetector.SimpleOnGestureListener
 import android.view.MotionEvent
+import android.view.OrientationEventListener
 import android.view.ScaleGestureDetector
+import android.view.Surface
 import androidx.camera.core.AspectRatio
 import androidx.camera.core.AspectRatio.Ratio
 import androidx.camera.core.Camera
@@ -46,6 +48,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
@@ -66,6 +69,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.concurrent.futures.await
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import java.text.SimpleDateFormat
 import java.util.Locale
 import kotlin.math.max
@@ -201,6 +206,35 @@ private fun CameraContent(
     val cameraState = bindingCamera?.cameraInfo?.cameraState?.observeAsState()
     val torchState = bindingCamera?.cameraInfo?.torchState?.observeAsState(TorchState.OFF)
     val hasFlashUnit = bindingCamera?.cameraInfo?.hasFlashUnit() ?: false
+
+    // https://developer.android.com/training/camerax/orientation-rotation?hl=ja#orientation-event-listener-setup
+    val orientationEventListener = object : OrientationEventListener(context) {
+        override fun onOrientationChanged(orientation: Int) {
+            if (orientation == ORIENTATION_UNKNOWN) return
+            val rotation = when (orientation) {
+                in 45 until 135 -> Surface.ROTATION_270
+                in 135 until 225 -> Surface.ROTATION_180
+                in 225 until 315 -> Surface.ROTATION_90
+                else -> Surface.ROTATION_0
+            }
+            imageCapture.targetRotation = rotation
+        }
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_START) {
+                orientationEventListener.enable()
+            }
+            if (event == Lifecycle.Event.ON_STOP) {
+                orientationEventListener.disable()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     LaunchedEffect(currentLensFacing, currentAspectRatio) {
         try {
