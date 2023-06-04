@@ -160,8 +160,16 @@ private fun CameraContent(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var currentLensFacing: CameraSelector by remember {
-        mutableStateOf(CameraSelector.DEFAULT_BACK_CAMERA)
+        mutableStateOf(
+            if (provider.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA)) {
+                CameraSelector.DEFAULT_BACK_CAMERA
+            } else {
+                CameraSelector.DEFAULT_FRONT_CAMERA
+            }
+        )
     }
+    val canFlipCamera = provider.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA) &&
+            provider.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA)
     val previewView = remember { PreviewView(context) }
     val imageCapture = remember {
         ImageCapture.Builder()
@@ -257,6 +265,7 @@ private fun CameraContent(
             enabled = cameraState?.value?.type == CameraState.Type.OPEN,
             hasFlashUnit = hasFlashUnit,
             torchState = torchState?.value,
+            canFlipCamera = canFlipCamera,
             onClickTorch = {
                 val camera = bindingCamera ?: return@CameraUiController
                 camera.cameraControl.enableTorch(torchState?.value == TorchState.OFF)
@@ -345,6 +354,7 @@ private fun CameraUiController(
     enabled: Boolean,
     hasFlashUnit: Boolean,
     torchState: Int?,
+    canFlipCamera: Boolean,
     onClickTorch: () -> Unit,
     onClickShutter: () -> Unit,
     onClickFlipCamera: () -> Unit,
@@ -385,19 +395,21 @@ private fun CameraUiController(
                 .size(70.dp)
         )
 
-        IconButton(
-            onClick = onClickFlipCamera,
-            enabled = enabled,
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 16.dp, bottom = 52.dp)
-                .size(32.dp)
-        ) {
-            Icon(
-                painter = painterResource(id = R.drawable.ic_flip_camera),
-                contentDescription = null,
-                tint = Color.Unspecified
-            )
+        if (canFlipCamera) {
+            IconButton(
+                onClick = onClickFlipCamera,
+                enabled = enabled,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 16.dp, bottom = 52.dp)
+                    .size(32.dp)
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_flip_camera),
+                    contentDescription = null,
+                    tint = Color.Unspecified
+                )
+            }
         }
     }
 }
