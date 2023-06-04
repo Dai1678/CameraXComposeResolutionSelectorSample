@@ -2,10 +2,11 @@
 Camera X × Jetpack Compose × Resolution Selector API sample
 
 ## Feature
-- Take photo (Only Back Camera)
+- Take photo
+- Switch lens
+- Switch aspect ratio
 - Zoom
 - Torch
 - Touch & Focus
 
-<img src="https://github.com/Dai1678/CameraXComposeResolutionSelectorSample/assets/19250035/054fc4fe-6876-47a1-9907-772badc9176e" width=300>
-
+<img src="https://github.com/Dai1678/CameraXComposeResolutionSelectorSample/assets/19250035/ebdd3207-e8ae-4f0a-9413-575158b2f3b7" width=300>
