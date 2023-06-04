@@ -25,6 +25,7 @@ import androidx.camera.core.resolutionselector.ResolutionSelector.ALLOWED_RESOLU
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -361,20 +362,16 @@ private fun CameraUiController(
             }
         }
 
-        IconButton(
-            onClick = onClickShutter,
-            enabled = enabled,
+        Icon(
+            painter = painterResource(id = R.drawable.ic_shutter),
+            contentDescription = null,
+            tint = Color.Unspecified,
             modifier = Modifier
+                .clickable(enabled = enabled, onClick = onClickShutter)
                 .align(Alignment.BottomCenter)
                 .padding(32.dp)
-        ) {
-            Icon(
-                painter = painterResource(id = R.drawable.ic_shutter),
-                contentDescription = null,
-                tint = Color.Unspecified,
-                modifier = Modifier.size(40.dp)
-            )
-        }
+                .size(70.dp)
+        )
 
         IconButton(
             onClick = onClickFlipCamera,
